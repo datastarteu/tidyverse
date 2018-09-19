@@ -1,0 +1,37 @@
+body{ /* Normal  */
+      font-size: 12px;
+      font-family: "Raleway", Times, serif;
+      font-color: #032b2f;
+  }
+
+h1.title {
+  font-size: 28px;
+  font-family: "Montserrat", Times, serif;
+  color: #d73a31;
+}
+
+h1 { /* Header 1 */
+  font-size: 22px;
+  font-family: "Montserrat", Times, serif;  
+  color: #08708a ;
+}
+
+h2 { /* Header 2 */
+    font-size: 18px;
+    font-family: "Montserrat", Times, serif;
+    color: #08708a ;
+}
+
+h3 { /* Header 3 */
+  font-size: 14px;
+  font-family: "Montserrat", Times, serif;
+  color: #08708a;
+}
+
+code.r{ /* Code block */
+    font-size: 12px;
+}
+
+pre { /* Code block - determines code spacing between lines */
+    font-size: 14px;
+}

@@ -1,0 +1,783 @@
+---
+title: "Mastering the tidyverse"
+output: 
+  html_document: 
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    self_contained: yes
+    highlight: pygments
+    css: datastart.css
+---
+
+<img src="img/logo.png" width="200" style="position:absolute;top:0px;right:0px;" />
+
+
+
+# Welcome!
+
+This tutorial is partly based on the book "R for Data Science" which is freely available here: http://r4ds.had.co.nz/
+
+## What do you need to follow along?
+
+## Why data manipulation and visualization?
+
+The core component of any data analytics project is **data**. Understanding and manipulating data is crucial to:
+
+- Define the scope of a project: know what is possible with the current data, etc.
+- Prepare different data workflows. Data is rarely usable in raw form, some transformations need to be applied to it before modelling. *Garbage in, garbage out!*.
+- Present the results. Every analysis we do needs to have a **why**. Very often the outcome of this analysis needs to be communicated to decision makers or non-experts.
+
+In this course we will use the `tidyverse`, which is a coherent set of packages for the full lifecycle of a data science project. 
+
+Let's import the `tidyverse` library, which is a wrapper for all eight packages (as of 2018).
+
+```{r}
+library(tidyverse)
+```
+
+If this is not installed in your system, you need to `install.packages("tidyverse")` first.
+
+# Data manipulation with `dplyr`
+
+
+We turn now to `dplyr`. This package provides a function for each basic action with data: 
+
+- `filter()` (and `slice()`)
+- `arrange()`
+- `select()` (and `rename()`)
+- `distinct()`
+- `mutate()` (and `transmute()`)
+- `summarise()`
+- `sample_n()` (and `sample_frac()`)
+
+which can do many things together with the "%>%" (read "and then")
+
+
+We will use the [Online News Popularity](http://archive.ics.uci.edu/ml/datasets/Online+News+Popularity) data. 
+
+Let's start by loading it, and keep only a part:
+
+```{r}
+news<-read.csv("OnlineNewsPopularity.csv")[2:5]
+head(news) # Too many columns
+
+```
+
+
+We can use some base `R` functions to understand a bit what is going on:
+
+```{r}
+table(news$data_channel_is_lifestyle)
+```
+Or even something like this:
+
+
+```{r}
+table(news$data_channel_is_lifestyle, news$data_channel_is_bus)
+```
+
+But as we will see, things get messy when the questions to our data become harder!
+
+Let's say we want the articles from a specific day:
+
+```{r, echo = TRUE}
+# Filter the articles from a specific day
+oldest <- dplyr::filter(news, timedelta == 731 )
+head(oldest, n = 2)
+```
+or, using the operator %>%:
+
+```{r, echo = TRUE}
+news %>% dplyr::filter(timedelta==731) %>% head(n=2)
+```
+
+In pure R (without dplyr), we can do
+
+```{r, echo = TRUE}
+oldest <- news[news$timedelta==731,]
+head(oldest, n = 2 )
+```
+
+###  filter()
+```{r, echo = TRUE}
+# Filter the articles from a specific day
+oldest <- dplyr::filter(news, timedelta == 731 )
+head(oldest, n = 2)
+
+```
+
+or, using the operator %>%:
+
+```{r, echo = TRUE}
+news %>% dplyr::filter(timedelta==731) %>% head(n=2)
+```
+
+In pure R (without dplyr), we can do
+
+```{r, echo = TRUE}
+oldest <- news[news$timedelta==731,]
+head(oldest, n = 2 )
+```
+
+###  slice()
+
+slice() filters rows by position, for instance:
+```{r, echo = TRUE}
+
+slice(news, 16:20)
+
+```
+
+###  arrange()
+
+arrange() orders columns and helps to break ties.
+
+```{r, echo = TRUE}
+
+news %>%
+  arrange(timedelta, n_tokens_title, n_tokens_content) %>% 
+  head(n=3)
+
+```
+
+We can use desc() to arrange a column in descending order.
+
+```{r, echo = TRUE}
+news %>% 
+  arrange(desc(timedelta), n_tokens_title, n_tokens_content) %>% 
+  head(n=3)
+```
+
+
+###  select()
+
+We can use select to, well, select specific columns:
+
+```{r, echo = TRUE}
+
+news %>% select(timedelta,n_tokens_content) %>% head(n=2)
+
+```
+
+
+```{r, echo = TRUE}
+news %>% select(-c(n_tokens_title,n_tokens_content)) %>% head(n=2)
+
+```
+
+We can use select() also to rename columns
+```{r, echo = TRUE}
+news %>% select(words_in_title = n_tokens_title) %>% head(n=3)
+```
+
+###  rename()
+This is useful to rename a column without dropping the other variables
+
+```{r, echo=TRUE}
+
+news %>% rename(words_in_title = n_tokens_title) %>% head(n=3)
+```
+
+###  distinct()
+
+This function allows us to find unique values in a table
+```{r, echo=TRUE}
+news %>% distinct(timedelta) %>% head(n=3)
+
+```
+
+```{r, echo=TRUE}
+news %>% distinct(timedelta,n_tokens_title) %>% nrow
+
+```
+
+###  mutate()
+Sometimes we need to add new columns that are function of existing columns, for instance:
+
+```{r, echo=TRUE}
+news %>% 
+  mutate(title_to_content = n_tokens_title/n_tokens_content
+         ,total_unique = n_tokens_content * n_unique_tokens ) %>% 
+  head(n=3)
+
+```
+
+We can recycle newly created variables!
+
+```{r, echo=TRUE}
+news %>% 
+  mutate(title_to_content = n_tokens_title/n_tokens_content
+         ,percentage = round(100*title_to_content,2) ) %>% 
+  head(n=3)
+
+```
+
+
+###  transmute()
+Like mutate(), but keeps only the newly created variables
+
+
+```{r, echo=TRUE}
+news %>% 
+  transmute(title_to_content = n_tokens_title/n_tokens_content
+         ,total_unique = n_tokens_content * n_unique_tokens ) %>% 
+  head(n=3)
+
+```
+
+
+### Sampling: sample_n() and sample_frac()
+These two functions allow us to sample randomly a fixed number of rows or a fraction. Use replace = TRUE for a sample with replacement, and you can add weights for the sampling if needed. More info in ?sample_n
+
+### Grouping functions
+
+All the functions above become really useful when we can apply them to groups. Let's load again the data, this time the full data frame:
+
+```{r}
+news<-read.csv("OnlineNewsPopularity.csv")
+```
+
+
+
+```{r, echo=TRUE}
+gps <- news %>% 
+  sample_frac(.1)%>%
+  group_by(data_channel_is_lifestyle
+          ,data_channel_is_world)%>%
+  summarise(count=n()
+            ,avg_imgs = mean(num_imgs, na.rm = TRUE)
+            , avg_videos =mean(num_videos, na.rm = TRUE)) 
+
+```
+
+### Plotting the final results
+
+```{r, echo=TRUE}
+barplot(gps$avg_imgs
+        , names.arg = c("Other", "Lifestyle", "World")
+        , main = "Average number of images")
+```
+
+
+### Another useful plot 
+
+```{r, echo = TRUE}
+plot(news$timedelta,news$shares
+     , type='l', main = "Number of shares across time"
+     , xlab = "Days since acquisition", ylab = "Number of shares")
+
+```
+
+Let's test some hypothesis:
+
+- What are the 5 most shared articles?
+- Which channel (among the six described) has the largest average number of shares? does it change across time?
+- Which day has the most shares, on average?
+
+
+What are the 5 most shared articles?
+
+```{r, echo=TRUE}
+news %>% arrange(desc(shares)) %>% select(url,shares) %>% head(n=5)
+```
+
+Which channel has the largest number of shares?
+
+```{r, echo=TRUE}
+ex2a <- news %>% 
+  group_by(data_channel_is_lifestyle
+  , data_channel_is_entertainment
+  , data_channel_is_bus
+  , data_channel_is_socmed
+  , data_channel_is_tech
+  , data_channel_is_world)%>% 
+  summarise(avg_shares = mean(shares))
+  
+```
+... and the plot:
+
+```{r, echo=TRUE}
+barplot(ex2a$avg_shares,
+        names.arg =c("Other","LS","Ent","Bus","SM","Tech","World"))
+
+
+```
+
+Does it change with time?
+
+```{r, echo=TRUE}
+ex2b <- news %>% dplyr::filter(data_channel_is_world ==1) 
+
+plot(ex2b$timedelta,ex2b$shares
+     , type='l', main = "Number of shares across time- World"
+     , xlab = "Days since acquisition", ylab = "Number of shares")
+
+```
+
+Which day has the most shares, on average?
+
+```{r, echo=TRUE}
+ex3 <- news %>% 
+  group_by(weekday_is_monday
+  , weekday_is_tuesday
+  , weekday_is_wednesday
+  , weekday_is_thursday
+  , weekday_is_friday
+  , weekday_is_saturday
+  , weekday_is_sunday)%>% 
+  summarise(avg_shares = mean(shares))
+```
+
+and the plot:
+
+```{r,echo = TRUE}
+  
+barplot(ex3$avg_shares,
+        names.arg =c("Mon", "Tue",'Wed', "Thu", "Fri", "Sat", "Sun"))
+
+
+```
+
+
+# Data Visualization with `ggplot2`
+
+We will use as our running example the `mpg` data set available with the `tidyverse`.
+
+Let's take a look first:
+
+```{r}
+head(mpg)
+```
+
+This data set contains information about different cars. For more info on what these variables mean, try `?mpg`.
+
+
+## Baseline: Base R charts
+
+Suppose we want to plot the highway miles per gallon (`mpg$hwy`) as a function of engine displacement (`mpg$displ`). `R` comes with basic plotting functionality. We could do this, for instance, with the following command:
+
+
+```{r}
+plot(mpg$displ, mpg$hwy)
+```
+
+This is of course, ugly. We can add some formatting to make it nicer. 
+
+```{r}
+plot(mpg$displ, mpg$hwy, 
+     main="Performance as a function of engine displacement", 
+     xlab ="Engine displacement", ylab="Fuel performance", 
+     col='red')
+```
+
+How did I know this commands? Simply use `?plot` to display the help on the side menu in RStudio. That's fine for a simple plot, but when we are doing data exploration (aka Exploratory Data Analysis), this is not always efficient.
+
+## The grammar of graphics
+
+`ggplot2` instead implements a **grammar of graphics**. This is a structured way to create graphs. There are two basic constructs on a `ggplot2` chart:
+
+  - **plot**: that's the coordinate system(s) with the source data.
+  - **layer**: each of the possible representation of the data.
+
+Each layer has:
+
+- **Data**: No need to explain this one.
+- **Geometry**: Geometry of the data (points, lines, bars).
+- **Aesthetics**: Visual property of the data. 
+
+So, a plot is the canvas on which we paint, the layer is the things we paint there.
+
+For example:
+
+```{r}
+ggplot(data=mpg)+
+  geom_point(mapping=aes(x=displ, y=hwy))
+```
+
+The first command `ggplot(data=mpg)` creates the coordinate system with an empty chart. We add to this chart a layer where the data is mapped to the axis and represented with the given geometry (`geom_point`).
+
+We can add some color per class:
+
+```{r}
+ggplot(data=mpg)+
+  geom_point(mapping=aes(x=displ, y=hwy)
+             , color="red")+
+  labs(x="Engine displacement", y="Fuel performance"
+       , title="Performance as a function of engine displacement")+
+  theme_bw()
+  
+```
+
+Ok, so what? We have a different way to make the same plot, but that's not really useful nor terribly interesting. Let's ignore that for a second and observe that, while there is a decreasing trend (the performance decreases as the engine displacement increases), there are a few outlier points. Why would that be? Let's change **one single line** of the previous code to add color by car type.
+
+```{r}
+ggplot(data=mpg)+
+  geom_point(mapping=aes(x=displ, y=hwy, color=class))+
+  labs(x="Engine displacement", y="Fuel performance"
+       , title="Performance as a function of engine displacement")+
+  theme_bw()
+```
+
+
+Now we have a much more informative chart! We see that those outlierish points correspond to cars with two seats (sports cars).
+
+Note that we had to change the aesthetics: the color corresponds to the class, instead of being uniformly applied to the chart.
+
+This is better, but still a bit crowded. How about splitting this chart in several charts per class? We can do that with the `facet_wrap()` function.
+
+```{r}
+ggplot(data=mpg)+
+  geom_point(mapping=aes(x=displ, y=hwy, color=class))+
+  labs(x="Engine displacement", y="Fuel performance"
+       , title="Performance as a function of engine displacement")+
+  facet_wrap(~ class, nrow=2)+
+  theme_bw()
+```
+
+Do you want to save your masterpiece? `ggsave('myfile.png')` will do.
+
+
+## Beyond scatter plots
+
+We can replace the `geom_point()` object with other types, for instance
+
+```{r}
+ggplot(data=mpg)+
+  geom_smooth(mapping = aes(x=displ, y=hwy))
+```
+
+Note however that not all aesthetics can be applied to all geometries. Now this is the part where `ggplot2` shines: You can put several layers together!
+
+```{r}
+ggplot(data=mpg)+
+  geom_point(mapping = aes(x=displ, y=hwy, color=class))+
+  geom_smooth(mapping = aes(x=displ, y=hwy))
+```
+
+Note that there's a small detail with this: if you wanted to change the `y` variable, now you have to do changes in two layers, not only in one. To prevent that, you can specify the mapping on the `ggplot` function instead, so that it would be treated as a *global* mapping that applies to each layer.
+
+For instance,
+
+```{r}
+ggplot(data=mpg, mapping = aes(x=displ, y=hwy))+
+  geom_point(mapping=aes(color=class))+
+  geom_smooth()
+```
+
+
+## Statistical transformations
+
+We can do groupings per category. For instance, let's see how many cars do we have from each class:
+
+```{r}
+ggplot(data=mpg)+
+  geom_bar(mapping = aes(x=class))
+```
+
+Note that here we are not plotting the "raw" values that come in our data. Rather, we are doing aggregates **and then** plotting such values. Other graphs also calculate new values:
+
+- Bar charts, histograms and other frequency polygons bin your data and then plot the number of elements that fall in each bin.
+- Smoothers fit a model (`geom_smooth()` for instance).
+- Boxplots/violinplots compute a special statistical plot.
+
+Another way of doing the previous chart is using the `stat_count` function explicitly:
+
+```{r}
+ggplot(data=mpg)+
+  stat_count(mapping = aes(x=class))
+```
+
+
+
+Every `geom_` has a default `stat_` associated to it. Sometimes we need to override it: 
+
+
+```{r}
+df <- tribble(
+  ~class,         ~count,
+   "2seater",        5,
+ "compact",       47,
+ "midsize",       41,
+ "minivan",       11,
+ "pickup",        33,
+ "subcompact",    35,
+ "suv",           62
+)
+
+ggplot(data = df) +
+  geom_bar(mapping = aes(x = class, y = count), stat = "identity")
+```
+
+When the data is already summarized, as in the example above, we need to override the default `stat_` that comes with `geom_bar`, namely, `stat_count`.
+
+Sometimes you do not have the data aggregated, but you want to override the default count to get a proportion chart instead. In that case, you can do the following:
+
+```{r}
+ggplot(data=mpg)+
+  geom_bar(mapping = aes(x=class, y=..prop.., group=1))
+```
+
+You can also look at the different variations within each class:
+
+```{r}
+ggplot(data = mpg)+
+  stat_summary(
+    mapping = aes(x=class, y=hwy), 
+    fun.ymin = min,
+    fun.ymax = max,
+    fun.y = median
+  )
+```
+
+
+## Position adjustments
+
+We can color bar charts too, using either `color`:
+
+```{r}
+ggplot(data = mpg)+
+  geom_bar(mapping = aes(x=class, color=drv))
+```
+
+or `fill`:
+
+```{r}
+ggplot(data = mpg)+
+  geom_bar(mapping = aes(x=class, fill=drv))
+```
+
+The bars get in this case stacked. This is not great because the bars end up covering each other. We can make them visible by making the bars slightly transparent:
+
+```{r}
+ggplot(data = mpg)+
+  geom_bar(mapping = aes(x=class, fill=drv), alpha=0.2, position = "identity")
+```
+
+
+
+Or, we can control the position:
+
+```{r}
+ggplot(data = mpg)+
+  geom_bar(mapping = aes(x=class, fill=drv), position = "fill")
+```
+
+We can also put them side by side:
+
+```{r}
+ggplot(data = mpg)+
+  geom_bar(mapping = aes(x=class, fill=drv), position = "dodge")
+```
+
+
+## Exercises
+
+Using the `diamonds` data set, reproduce the charts below. You might find it handy to get a copy of [RStudio's Data Visualization Cheatsheet](https://www.rstudio.com/resources/cheatsheets/#ggplot2)
+
+```{r,echo=F}
+diamonds %>%
+ggplot() + 
+  geom_boxplot(aes(factor(cut), price, fill=cut)) + 
+  ggtitle("Diamond Price according Cut") + 
+  xlab("Type of Cut") + 
+  ylab("Diamond Price USD") + 
+  coord_cartesian(ylim=c(0,7500))
+```
+
+```{r, echo=FALSE}
+diamonds %>%
+ggplot() +
+  geom_violin(aes(factor(color), (price/carat), fill=color)) + 
+  ggtitle("Diamond Price per Carat according Color") + 
+  xlab("Color") + ylab("Diamond Price per Carat USD")
+```
+
+
+```{r, echo=FALSE}
+ggplot(data=diamonds) + 
+  geom_density(aes(x=price, group=cut, fill=cut), adjust=1.5)
+
+```
+
+
+```{r, echo=FALSE}
+ggplot(data=diamonds) + 
+  geom_density(aes(x=price, group=cut, fill=cut), adjust=1.5 , alpha=0.2)
+```
+
+
+```{r, echo=FALSE}
+ggplot(data=diamonds) + 
+  geom_density(aes(x=price, group=cut, fill=cut), adjust=1.5, position="fill")
+```
+
+```{r, echo=FALSE}
+diamonds %>%
+  ggplot()+
+  scale_color_hue()+
+  geom_point(aes(x=carat,
+             y=price,
+             color=color))+
+  facet_wrap(~cut)
+```
+
+
+# Strings and text with `stringr` and `tidytext`
+
+
+The `stringr` package consists of functions for:
+
+- Character manipulation in strings.
+- Whitespace tools (add, remove and manipulate whitespace).
+- Pattern matching functions, like regular expressions.
+
+## Introduction to stringr
+
+We can get the length of a string:
+
+```{r}
+str_length("Machine learning")
+```
+
+and get a part of it:
+
+```{r}
+s <- c("Machine learning")
+str_sub(s, 1, 4)
+```
+We can also use this function to modify strings:
+
+```{r}
+str_sub(s, 8,8) <- "-"
+s
+```
+
+There are also functions to modify whitespace:
+
+```{r}
+
+short_long <- c("a short", "and a long string")
+str_pad(short_long, 20)
+```
+
+In this example, whitespace was added to have all strings of the same length.
+
+To truncate strings:
+
+```{r}
+str_trunc(short_long, 8)
+```
+
+Sometimes we do not want to add whitespace, but rather remove it:
+
+```{r}
+test <- c(" A lot of whitespace   ")
+str_trim(test, "left")
+```
+
+and from the right:
+
+```{r}
+str_trim(test,"right")
+```
+Sometimes it is useful to have the same case (upper/lowercase):
+
+```{r}
+str_to_upper(test)
+```
+
+Similarly, `str_to_lower()` and `str_to_title()` can be used for lowercase and title (first letter of each word is capitalized). 
+
+### Pattern matching
+
+```{r}
+fruits <- c("mango", "coconut", "grape", "pear")
+str_view(fruits, "an") 
+```
+
+
+We can use `.` to match any character:
+
+```{r}
+str_view(fruits, 'pe.')
+```
+
+The `.` has then a special use. This is a bit unfortunate, since we sometimes need to match it. We then have to use a special escape character, `\\.`, since `\` is also reserved. For instance:
+
+```{r}
+urls <- c("seznam.cz", "google.com", "facebook.com")
+str_view(urls, "\\.")
+```
+
+By default, regular expressions match any part of the string, but we can force it to anchor the beginning or end using the symbols `^` and `$`.
+
+```{r}
+str_view(fruits, '^m')
+```
+
+
+Other separators include:
+
+- `\d:` matches any digit.
+- `\s:` matches any whitespace (e.g. space, tab, newline).
+- `[abc]:` matches a, b, or c.
+- `[a-z]`: matches lowercase letters.
+- `[A-Z]`: matches uppercase letters.
+- `[^abc]:` matches anything except a, b, or c.
+- `?`: appears 0 or 1 times
+- `+`: appears 1 or more times
+- `*`: appears 0 or more times
+
+We can also specify the number of matches:
+
+- `{n}`: exactly n matches
+- `{n,}`: n or more matches
+- `{,m}`: at most m matches
+- `{n,m}`: between n and m matches
+
+For instance, let's extract emails:
+
+```{r}
+text <- c("info@datastart.eu", "webmaster@cvut.cz", "bacon")
+str_view(text, '[a-z]{4,10}@[a-z]{4,10}\\.[a-z]{2,}')
+
+```
+
+This is of course a somewhat simplified version, since email addresses can be more complicated, see [here](http://emailregex.com/) for instance. 
+
+
+## Practice!
+
+Let's use the `words`, `sentences` and `fruits` datasets included in `stringr`. Use the function `str_detect`.
+
+- Find all words that start or end with x (in `words`, this and the next three exercises).
+- Find all words that start with a vowel and end with a consonant.
+- Are there any words that contain at least one of each vowel?
+- What word has the highest proportion of vowels? 
+- What are the five most common words in `sentences`?
+- How many fruits begin with a vowel?
+
+
+
+
+# Putting all together
+
+
+We are ready to come back to the news data set:
+
+```{r}
+news<-read.csv("OnlineNewsPopularity.csv")
+```
+
+You will need to combine the tools from this tutorial to solve the following questions. You should do a visualization, whenever relevant.
+
+- Plot the distribution of shares per weekday and per category (hint: facets).
+- What article has the highest number of shares on each category?
+- Extract the title of the articles from the url. 
+- Which brand is more mentioned? Apple or Samsung?
+
+
+
+
